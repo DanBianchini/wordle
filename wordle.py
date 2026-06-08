@@ -1,12 +1,12 @@
 import random
 import os
 import argparse
+import matplotlib.pyplot as plt
 import text_color as tc
 from wordle_pal import WordlePal
 
 DEFAULT_NUM_GAMES = 100 # default # of games to be played by WordlePal when not specified
 letters = ('q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '\n', 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', '\n ', 'z', 'x', 'c', 'v', 'b', 'n', 'm')
-wordle_pal_playing = False
 display = True # whether to display game end results when using WordlePal
 turns_taken = [0, 0, 0, 0, 0, 0, 0] # will store the # of times each game has ended in each # of turns. turns_taken[0] will represent losses
 
@@ -199,13 +199,15 @@ def play_game(word: str, wp: WordlePal = None) -> bool:
 
     return result
 
-def game_cycle(num_games: int = None) -> None:
+def game_cycle(num_games: int = None, wordle_pal_playing: bool = False) -> None:
     """
     IF NO PARAMETER IS PROVIDED: Traps the user in a loop of playing wordle games until they type 'exit'.
     IF PARAMETER IS PROVIDED: Plays this # of games.
 
     :param num_games: Number of games for WordlePal to play.
     :type num_games: int
+    :param wordle_pal_playing: True if WordlePal is playing.
+    :type wordle_pal_playing: bool
     """
     # keep track of game stats during this session
     games_played = 0
@@ -244,9 +246,8 @@ def game_cycle(num_games: int = None) -> None:
             if games_played >= num_games:
                 break
 
-# TODO: implement
-def display_stats() -> None:
-    print(turns_taken)
+def display_stats(graph: bool = False) -> None:
+    print('GAME SESSION STATISTICS:')
 
     # print game session stats
     print(f"{tc.yellow("Games Played:")}\t{sum(turns_taken)}")
@@ -254,6 +255,14 @@ def display_stats() -> None:
     print(f"{tc.red("Games Lost:")}\t{turns_taken[0]}")
     print(f"{tc.blue("Game Win %:")}\t{sum(turns_taken[1:]) * 100 / sum(turns_taken)}%")
     print()
+
+    # display bar graph if requested
+    if graph:
+        plt.bar(['Loss', '1', '2', '3', '4', '5', '6'], turns_taken)
+        plt.title('Games Won in x Turns')
+        plt.xlabel('# of Turns Taken')
+        plt.ylabel('# of Games')
+        plt.show()
 
 if __name__ == "__main__":
     # parse command line arguments
@@ -266,14 +275,13 @@ if __name__ == "__main__":
     # check if WordlePal is taking this one
     if args.pal:
         print(tc.rainbow('\nWordlePal will take it from here!\n'))
-        wordle_pal_playing = True
         if not args.display:
             display = False
         if not args.games:
             raise Exception("Must specify # of games (using -g/--game [GAMES] option) to be played when using WordlePal.")
     
     # start the game cycle
-    game_cycle(args.games)
+    game_cycle(args.games, args.pal)
 
     # display stats from game cycle
-    display_stats()
+    display_stats(args.pal)
