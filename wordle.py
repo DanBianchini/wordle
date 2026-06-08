@@ -2,23 +2,25 @@ import random
 import os
 import argparse
 import text_color as tc
-from wordle_pal import wordle_pal_guess
+from wordle_pal import WordlePal
 
+DEFAULT_NUM_GAMES = 100 # default # of games to be played by WordlePal when not specified
 letters = ('q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '\n', 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', '\n ', 'z', 'x', 'c', 'v', 'b', 'n', 'm')
 wordle_pal_playing = False
-display = True
+display = True # whether to display game end results when using WordlePal
+turns_taken = [0, 0, 0, 0, 0, 0, 0] # will store the # of times each game has ended in each # of turns. turns_taken[0] will represent losses
 
 with open('5-letter-words.txt', 'r') as f:
-    words = [line.rstrip('\n') for line in f]
+    WORDS = [line.rstrip('\n') for line in f]
 
 def pick_word() -> str:
     """
     Returns a random word from the list of valid words.
     
-    :return: Random word from words[]
+    :return: Random word from WORDS[]
     :rtype: str
     """
-    return words[random.randint(0, len(words) - 1)]
+    return WORDS[random.randint(0, len(WORDS) - 1)]
 
 def color_guess(guess: str, answer: str) -> str:
     """
@@ -62,7 +64,7 @@ def receive_guess() -> str:
             continue
 
         # check if guess is a valid word
-        if guess not in words:
+        if guess not in WORDS:
             print("Guess must be a valid 5-letter word")
             continue
 
@@ -91,15 +93,19 @@ def print_letter_history(correct: list[str], wrong: list[str]):
 
     print('\033[0m') # reset ANSI color, newline for spacing
 
-def play_game(word: str) -> bool:
+def play_game(word: str, wp: WordlePal = None) -> bool:
     """
     Play a single game of wordle.
     
     :param word: The answer to be guessed. 5-letter word.
     :type word: str
+    :param wp: WordlePal, if playing.
+    :type wp: WordlePal
     :return: True for win, False for loss.
     :rtype: bool
     """
+    global turns_taken
+
     if display:
         print(f"\033[95m--- GAME START ---\033[0m\n")
 
@@ -110,7 +116,8 @@ def play_game(word: str) -> bool:
     
     # 6 turns
     for turn in range(1, 7):
-        if display:
+        # if human is playing, print info and accept guess from user
+        if wp is None:
             # print turn number
             print(f"\033[95m--- GUESS #{turn} ---\033[0m")
 
@@ -123,12 +130,12 @@ def play_game(word: str) -> bool:
                 print(prev_guess)
             print() # newline for spacing
 
-        # check if WordlePal is playing
-        if wordle_pal_playing:
-            guess = wordle_pal_guess()
-        else:
             guess = receive_guess() # receive player guess
             print() # newline for spacing
+
+        # if WordlePal is playing, get guess from it
+        else:
+            guess = wp.random_guess() # receive WordlePal guess
 
         # add guess to guess_history[]
         guess_history.append(color_guess(guess, word))
@@ -148,7 +155,31 @@ def play_game(word: str) -> bool:
             else:
                 if letter not in wrong_letter_history:
                     wrong_letter_history.append(letter)
+
+        # TODO: if WordlePal is playing, give feedback
+        if wp is not None:
+            # create empty lists to store info
+            in_word = [] # True if letter is in the answer
+            right_place = [] # True if letter is in correct place
+
+            # iterate through guess & answer and compare
+            for i in range(5):
+                # add to right_place[]
+                if guess[i] == word[i]:
+                    right_place.append(True)
+                else:
+                    right_place.append(False)
+                
+                # add to in_word[]
+                if guess[i] in word:
+                    in_word.append(True)
+                else:
+                    in_word.append(False)
+
+            # call class function to give feedback
+            wp.receive_feedback(tuple(right_place), tuple(in_word))
     
+    # display game-end information if 'display' global variable is set
     if display:
         # print letter history
         print_letter_history(correct_letter_history, wrong_letter_history)
@@ -159,6 +190,12 @@ def play_game(word: str) -> bool:
             print(prev_guess)
 
         print(f"\n\033[95m--- GAME END ---\033[0m\n")
+
+    # add # of turns taken to turns_taken[]
+    if result:
+        turns_taken[turn] += 1
+    else:
+        turns_taken[0] += 1
 
     return result
 
@@ -173,11 +210,14 @@ def game_cycle(num_games: int = None) -> None:
     # keep track of game stats during this session
     games_played = 0
     games_won = 0
-    games_lost = 0
 
     while True:
+        # if WordlePal is playing, create an instance of WordlePal
+        if wordle_pal_playing:
+            wp = WordlePal()
         # if user is playing, display game start message
-        if not wordle_pal_playing:
+        else:
+            wp = None
             u_input = input("Press Enter to play. 'exit' to quit.\n")
 
             # check if player is trying to quit
@@ -187,13 +227,12 @@ def game_cycle(num_games: int = None) -> None:
         word = pick_word() # pick a random word from the list
 
         # play game & display win/lose message
-        if play_game(word):
+        if play_game(word, wp):
             games_won += 1 # increment games_won
             # display game win message
             if display:
                 print(tc.green("You win!"), end='\n\n')
         else:
-            games_lost += 1 # increment games_lost
             # display game loss message
             if display:
                 print(f"{tc.red("You lose!")} The word was {tc.yellow(word)}.", end='\n\n')
@@ -205,23 +244,36 @@ def game_cycle(num_games: int = None) -> None:
             if games_played >= num_games:
                 break
 
+# TODO: implement
+def display_stats() -> None:
+    print(turns_taken)
+
     # print game session stats
-    print(f"{tc.yellow("Games Played:")} {games_played}")
-    print(f"{tc.green("Games Won:")} {games_won}")
-    print(f"{tc.red("Games Lost:")} {games_lost}")
+    print(f"{tc.yellow("Games Played:")}\t{sum(turns_taken)}")
+    print(f"{tc.green("Games Won:")}\t{sum(turns_taken[1:])}")
+    print(f"{tc.red("Games Lost:")}\t{turns_taken[0]}")
+    print(f"{tc.blue("Game Win %:")}\t{sum(turns_taken[1:]) * 100 / sum(turns_taken)}%")
     print()
 
 if __name__ == "__main__":
     # parse command line arguments
     parser = argparse.ArgumentParser(description="Run to play Wordle. Use the -p option to see WordlePal play.")
     parser.add_argument('-p', '--pal', action='store_true', help="Use this option to have WordlePal play.")
+    parser.add_argument('-d', '--display', action='store_true', help="Use this option to display game results when WordlePal is playing.")
+    parser.add_argument('-g', '--games', action='store', default=None, type=int, help=f"Use this option to specify the # of games to be played. If not specified when using WordlePal, defaults to {DEFAULT_NUM_GAMES}")
     args = parser.parse_args()
 
     # check if WordlePal is taking this one
     if args.pal:
-        print('\nWordlePal will take it from here!')
+        print(tc.rainbow('\nWordlePal will take it from here!\n'))
         wordle_pal_playing = True
-        display = False
-        game_cycle(100)
-    else:
-        game_cycle()
+        if not args.display:
+            display = False
+        if not args.games:
+            raise Exception("Must specify # of games (using -g/--game [GAMES] option) to be played when using WordlePal.")
+    
+    # start the game cycle
+    game_cycle(args.games)
+
+    # display stats from game cycle
+    display_stats()
