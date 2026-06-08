@@ -4,6 +4,7 @@ import argparse
 import matplotlib.pyplot as plt
 import text_color as tc
 from wordle_pal import WordlePal
+from tqdm import tqdm
 
 DEFAULT_NUM_GAMES = 100 # default # of games to be played by WordlePal when not specified
 letters = ('q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '\n', 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', '\n ', 'z', 'x', 'c', 'v', 'b', 'n', 'm')
@@ -199,7 +200,7 @@ def play_game(word: str, wp: WordlePal = None) -> bool:
 
     return result
 
-def game_cycle(num_games: int = None, wordle_pal_playing: bool = False) -> None:
+def game_cycle(num_games: int = None, wordle_pal_playing: bool = False, pbar: tqdm = None) -> None:
     """
     IF NO PARAMETER IS PROVIDED: Traps the user in a loop of playing wordle games until they type 'exit'.
     IF PARAMETER IS PROVIDED: Plays this # of games.
@@ -241,6 +242,10 @@ def game_cycle(num_games: int = None, wordle_pal_playing: bool = False) -> None:
         
         games_played += 1 # increment game count
 
+        # if progress bar exists, update it
+        if pbar is not None:
+            pbar.update(1)
+
         # if num_games was provided, exit game cycle if num_games has been reached
         if num_games is not None:
             if games_played >= num_games:
@@ -280,8 +285,20 @@ if __name__ == "__main__":
         if not args.games:
             raise Exception("Must specify # of games (using -g/--game [GAMES] option) to be played when using WordlePal.")
     
+    # TODO: create progress bar if WordlePal is playing without display
+    if args.pal and not args.display:
+        print('Playing games...')
+        pbar = tqdm(total=args.games)
+    else:
+        pbar = None
+
     # start the game cycle
-    game_cycle(args.games, args.pal)
+    game_cycle(args.games, args.pal, pbar)
+
+    # close the progress bar if it was created
+    if pbar is not None:
+        pbar.close()
+        print() # newline for spacing
 
     # display stats from game cycle
     display_stats(args.pal)
